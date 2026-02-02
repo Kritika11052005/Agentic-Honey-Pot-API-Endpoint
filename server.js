@@ -156,6 +156,11 @@ class IntelligenceExtractor {
   };
 
   static extract(text) {
+    // FIX: Convert to string if not already a string
+    if (typeof text !== 'string') {
+      text = String(text);
+    }
+
     const intelligence = {
       bankAccounts: [...new Set((text.match(this.patterns.bankAccount) || []))],
       upiIds: [...new Set((text.match(this.patterns.upiId) || []).filter(id => 
@@ -319,13 +324,21 @@ app.get('/', (req, res) => {
 // Main message handling endpoint
 app.post('/api/message', authenticateAPIKey, async (req, res) => {
   try {
+    console.log('📥 Request Body:', JSON.stringify(req.body, null, 2));
+    
     const { conversationId, message, timestamp } = req.body;
 
-    // Validate request
-    if (!message) {
+    // FIX: Better validation for message field
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+      console.log('❌ Invalid message field:', typeof message, message);
       return res.status(400).json({
         success: false,
-        error: 'Missing required field: message'
+        error: 'Missing required field: message',
+        message: 'The "message" field must be a non-empty string',
+        received: {
+          type: typeof message,
+          value: message
+        }
       });
     }
 
@@ -363,6 +376,7 @@ app.post('/api/message', authenticateAPIKey, async (req, res) => {
     if (scamDetection.isScam && !conversation.scamDetected) {
       conversation.scamDetected = true;
       conversation.scamDetectionTime = new Date().toISOString();
+      console.log('🚨 Scam detected! Confidence:', scamDetection.confidence + '%');
     }
 
     // Step 2: Extract intelligence from message
@@ -387,6 +401,7 @@ app.post('/api/message', authenticateAPIKey, async (req, res) => {
     
     if (conversation.scamDetected) {
       // Use agentic AI handler
+      console.log('🤖 Generating agentic AI response...');
       aiResponse = await AgenticHandler.generateResponse(
         conversation.messages,
         message,
@@ -428,10 +443,11 @@ app.post('/api/message', authenticateAPIKey, async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
+    console.log('✅ Response sent successfully');
     res.json(response);
 
   } catch (error) {
-    console.error('Error processing message:', error);
+    console.error('❌ Error processing message:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
