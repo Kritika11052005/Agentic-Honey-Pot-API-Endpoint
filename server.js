@@ -1,5 +1,5 @@
 /**
- * Agentic Honey-Pot API Server - OpenRouter Version
+ * Agentic Honey-Pot API Server - FIXED FOR COMPETITION
  * HCL GUVI India Impact AI Buildathon
  * 
  * This server:
@@ -7,6 +7,7 @@
  * 2. Detects scam intent
  * 3. Engages scammers autonomously using AI (via OpenRouter)
  * 4. Extracts intelligence (bank accounts, UPI IDs, phishing links)
+ * 5. Returns CORRECT response format for validator
  */
 
 require('dotenv').config();
@@ -55,8 +56,6 @@ const authenticateAPIKey = (req, res, next) => {
   console.log('Clean Key (trimmed):', `"${cleanKey}"`);
   console.log('Expected Key (trimmed):', `"${expectedKey}"`);
   console.log('Keys Match:', cleanKey === expectedKey);
-  console.log('Clean Key Length:', cleanKey.length);
-  console.log('Expected Key Length:', expectedKey.length);
   
   if (cleanKey !== expectedKey) {
     console.log('❌ Result: Invalid API key');
@@ -126,7 +125,7 @@ class ScamDetector {
       isScam,
       confidence: Math.round(confidence),
       scamScore,
-      indicators: indicators.slice(0, 3) // Top 3 indicators
+      indicators: indicators.slice(0, 3)
     };
   }
 }
@@ -156,7 +155,6 @@ class IntelligenceExtractor {
   };
 
   static extract(text) {
-    // FIX: Convert to string if not already a string
     if (typeof text !== 'string') {
       text = String(text);
     }
@@ -169,12 +167,34 @@ class IntelligenceExtractor {
         )
       ))],
       phoneNumbers: [...new Set((text.match(this.patterns.phoneNumber) || []))],
-      urls: [...new Set((text.match(this.patterns.url) || []))],
+      phishingLinks: [...new Set((text.match(this.patterns.url) || []))],
       ifscCodes: [...new Set((text.match(this.patterns.ifscCode) || []))],
       emails: [...new Set((text.match(this.patterns.email) || []))]
     };
 
     return intelligence;
+  }
+
+  static calculateCompleteness(intelligence) {
+    const weights = {
+      bankAccounts: 30,
+      upiIds: 25,
+      phishingLinks: 20,
+      phoneNumbers: 15,
+      ifscCodes: 5,
+      emails: 5
+    };
+
+    let score = 0;
+    let maxScore = 100;
+
+    Object.keys(weights).forEach(key => {
+      if (intelligence[key] && intelligence[key].length > 0) {
+        score += weights[key];
+      }
+    });
+
+    return Math.round((score / maxScore) * 100) / 100;
   }
 }
 
@@ -184,17 +204,15 @@ class IntelligenceExtractor {
 class AgenticHandler {
   static async generateResponse(conversationHistory, userMessage, scamContext) {
     try {
-      // Build conversation context for AI
       const systemPrompt = this.buildSystemPrompt(scamContext);
       const messages = this.buildMessages(conversationHistory, userMessage, systemPrompt);
 
-      // Call OpenRouter API (OpenAI-compatible format)
       const response = await axios.post(
         'https://openrouter.ai/api/v1/chat/completions',
         {
           model: process.env.AI_MODEL || 'anthropic/claude-3.5-sonnet',
           messages: messages,
-          max_tokens: parseInt(process.env.MAX_TOKENS) || 1000,
+          max_tokens: parseInt(process.env.MAX_TOKENS) || 150,
           temperature: 0.7
         },
         {
@@ -203,7 +221,8 @@ class AgenticHandler {
             'Content-Type': 'application/json',
             'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
             'X-Title': 'Honeypot API'
-          }
+          },
+          timeout: 10000 // 10 second timeout
         }
       );
 
@@ -212,8 +231,6 @@ class AgenticHandler {
 
     } catch (error) {
       console.error('OpenRouter API Error:', error.response?.data || error.message);
-      
-      // Fallback response if API fails
       return this.getFallbackResponse(userMessage);
     }
   }
@@ -241,12 +258,8 @@ PERSONA:
 - Ask questions like "How do I do this?" or "Is this safe?"
 - Express willingness to comply but need more details
 
-SCAM CONTEXT:
-Confidence: ${scamContext.confidence}%
-Detected as: ${scamContext.isScam ? 'Likely Scam' : 'Unclear'}
-
 IMPORTANT RULES:
-- Keep responses under 100 words
+- Keep responses under 80 words
 - Sound human and natural
 - Never use technical jargon
 - Show slight confusion or concern
@@ -262,8 +275,9 @@ IMPORTANT RULES:
       }
     ];
     
-    // Add conversation history
-    for (const msg of history) {
+    // Add conversation history (last 5 turns only to save tokens)
+    const recentHistory = history.slice(-10);
+    for (const msg of recentHistory) {
       messages.push({
         role: msg.role === 'user' ? 'user' : 'assistant',
         content: msg.content
@@ -281,11 +295,11 @@ IMPORTANT RULES:
 
   static getFallbackResponse(message) {
     const responses = [
-      "Oh, I see. Can you please provide more details about this? I want to make sure I understand correctly.",
-      "This sounds important. What exactly do I need to do? Can you send me the link or account details?",
-      "I'm a bit confused. Could you explain the steps again? And what information do you need from me?",
+      "Oh, I see. Can you please provide more details? I want to make sure I understand correctly.",
+      "This sounds important. What exactly do I need to do? Can you send me the link or details?",
+      "I'm a bit confused. Could you explain the steps again? What information do you need?",
       "Okay, I want to help. Do you have a website or phone number I can use to verify this?",
-      "I received your message. Can you please share the account number or UPI ID where I should send this?"
+      "I received your message. Can you please share the account number or UPI ID details?"
     ];
     
     return responses[Math.floor(Math.random() * responses.length)];
@@ -302,17 +316,18 @@ app.get('/health', (req, res) => {
     success: true,
     status: 'healthy',
     service: 'Agentic Honey-Pot API',
-    version: '1.0.0',
+    version: '2.0.0',
     aiProvider: 'OpenRouter',
     timestamp: new Date().toISOString()
   });
 });
 
-// Test endpoint (no auth required for testing)
+// Test endpoint
 app.get('/', (req, res) => {
   res.json({
     success: true,
     message: 'Agentic Honey-Pot API is running',
+    version: '2.0.0',
     aiProvider: 'OpenRouter.ai',
     endpoints: {
       health: 'GET /health',
@@ -321,33 +336,34 @@ app.get('/', (req, res) => {
   });
 });
 
-// Main message handling endpoint
+// Main message handling endpoint - FIXED RESPONSE FORMAT
 app.post('/api/message', authenticateAPIKey, async (req, res) => {
   try {
     console.log('📥 Request Body:', JSON.stringify(req.body, null, 2));
     
     const { sessionId, conversationId, message, conversationHistory, metadata } = req.body;
 
-    // FIX: Handle nested message structure (message.text) or direct string
+    // Handle nested message structure
     let userMessage;
     let messageTimestamp;
+    let messageSender;
     
     if (typeof message === 'object' && message !== null) {
-      // Validator sends: { message: { text: "...", sender: "...", timestamp: ... } }
       userMessage = message.text;
       messageTimestamp = message.timestamp;
+      messageSender = message.sender;
     } else if (typeof message === 'string') {
-      // Direct string: { message: "..." }
       userMessage = message;
       messageTimestamp = req.body.timestamp;
+      messageSender = req.body.sender || 'scammer';
     }
 
     // Validate
     if (!userMessage || typeof userMessage !== 'string' || userMessage.trim().length === 0) {
-      console.log('❌ Invalid message field:', typeof message, message);
+      console.log('❌ Invalid message field');
       return res.status(400).json({
         success: false,
-        error: 'Missing required field: message',
+        error: 'INVALID_REQUEST_BODY',
         message: 'The "message" field or "message.text" must be a non-empty string',
         received: {
           type: typeof message,
@@ -356,47 +372,46 @@ app.post('/api/message', authenticateAPIKey, async (req, res) => {
       });
     }
 
-    // Generate conversation ID if not provided (use sessionId if available)
-    const convId = sessionId || conversationId || `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate conversation ID
+    const convId = sessionId || conversationId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Get or create conversation history
+    // Get or create conversation
     if (!conversations.has(convId)) {
       conversations.set(convId, {
         id: convId,
-        startTime: new Date().toISOString(),
+        startTime: Date.now(),
         messages: [],
         scamDetected: false,
         intelligence: {
           bankAccounts: [],
           upiIds: [],
           phoneNumbers: [],
-          urls: [],
+          phishingLinks: [],
           ifscCodes: [],
           emails: []
         },
         metrics: {
-          totalTurns: 0,
+          turnCount: 0,
           engagementDuration: 0
         }
       });
     }
 
     const conversation = conversations.get(convId);
-    const startTime = Date.now();
+    const requestStartTime = Date.now();
 
     // Step 1: Detect scam intent
     const scamDetection = ScamDetector.detect(userMessage);
     
     if (scamDetection.isScam && !conversation.scamDetected) {
       conversation.scamDetected = true;
-      conversation.scamDetectionTime = new Date().toISOString();
       console.log('🚨 Scam detected! Confidence:', scamDetection.confidence + '%');
     }
 
     // Step 2: Extract intelligence from message
     const extractedIntel = IntelligenceExtractor.extract(userMessage);
     
-    // Merge new intelligence with existing
+    // Merge intelligence
     Object.keys(extractedIntel).forEach(key => {
       conversation.intelligence[key] = [
         ...new Set([...conversation.intelligence[key], ...extractedIntel[key]])
@@ -407,64 +422,83 @@ app.post('/api/message', authenticateAPIKey, async (req, res) => {
     conversation.messages.push({
       role: 'user',
       content: userMessage,
-      timestamp: messageTimestamp || new Date().toISOString()
+      timestamp: messageTimestamp || Date.now()
     });
 
     // Step 4: Generate AI response
-    let aiResponse;
+    let aiResponseText;
     
     if (conversation.scamDetected) {
-      // Use agentic AI handler
       console.log('🤖 Generating agentic AI response...');
-      aiResponse = await AgenticHandler.generateResponse(
+      aiResponseText = await AgenticHandler.generateResponse(
         conversation.messages,
         userMessage,
         scamDetection
       );
     } else {
-      // Before scam detection, respond neutrally
-      aiResponse = "Hello! How can I help you today?";
+      aiResponseText = "Hello! How can I help you today?";
     }
 
     // Step 5: Add AI response to history
+    const responseTimestamp = Date.now();
     conversation.messages.push({
       role: 'assistant',
-      content: aiResponse,
-      timestamp: new Date().toISOString()
+      content: aiResponseText,
+      timestamp: responseTimestamp
     });
 
     // Step 6: Update metrics
-    conversation.metrics.totalTurns++;
-    const engagementTime = Date.now() - startTime;
-    conversation.metrics.engagementDuration += engagementTime;
+    conversation.metrics.turnCount++;
+    conversation.metrics.engagementDuration = responseTimestamp - conversation.startTime;
 
-    // Step 7: Prepare response
+    // Step 7: Calculate extraction completeness
+    const extractionCompleteness = IntelligenceExtractor.calculateCompleteness(
+      conversation.intelligence
+    );
+
+    // ============================================
+    // CRITICAL: CORRECT RESPONSE FORMAT FOR VALIDATOR
+    // ============================================
     const response = {
-      success: true,
-      conversationId: convId,
-      response: aiResponse,
-      scamDetection: {
-        detected: scamDetection.isScam,
-        confidence: scamDetection.confidence,
-        scamScore: scamDetection.scamScore
+      sessionId: convId,
+      scamDetected: conversation.scamDetected,
+      confidence: scamDetection.confidence / 100, // Convert to 0-1 scale
+      agentResponse: {
+        text: aiResponseText,
+        sender: "agent",
+        timestamp: responseTimestamp
       },
-      intelligence: conversation.intelligence,
-      metrics: {
-        totalTurns: conversation.metrics.totalTurns,
+      extractedIntelligence: {
+        bankAccounts: conversation.intelligence.bankAccounts,
+        upiIds: conversation.intelligence.upiIds,
+        phishingLinks: conversation.intelligence.phishingLinks,
+        phoneNumbers: conversation.intelligence.phoneNumbers,
+        other: {
+          ifscCodes: conversation.intelligence.ifscCodes,
+          emails: conversation.intelligence.emails
+        }
+      },
+      conversationMetrics: {
+        turnCount: conversation.metrics.turnCount,
         engagementDuration: conversation.metrics.engagementDuration,
-        averageResponseTime: Math.round(conversation.metrics.engagementDuration / conversation.metrics.totalTurns)
-      },
-      timestamp: new Date().toISOString()
+        extractionCompleteness: extractionCompleteness
+      }
     };
 
     console.log('✅ Response sent successfully');
+    console.log('📊 Metrics:', {
+      turns: conversation.metrics.turnCount,
+      duration: conversation.metrics.engagementDuration + 'ms',
+      completeness: extractionCompleteness
+    });
+    
     res.json(response);
 
   } catch (error) {
     console.error('❌ Error processing message:', error);
     res.status(500).json({
       success: false,
-      error: 'Internal server error',
+      error: 'INTERNAL_SERVER_ERROR',
       message: error.message
     });
   }
@@ -487,23 +521,12 @@ app.get('/api/conversation/:id', authenticateAPIKey, (req, res) => {
   });
 });
 
-// Get all conversations (for debugging)
-app.get('/api/conversations', authenticateAPIKey, (req, res) => {
-  const allConversations = Array.from(conversations.values());
-  
-  res.json({
-    success: true,
-    count: allConversations.length,
-    conversations: allConversations
-  });
-});
-
 // ============================================
 // START SERVER
 // ============================================
 app.listen(PORT, () => {
   console.log('━'.repeat(50));
-  console.log('🍯 Agentic Honey-Pot API Server (OpenRouter)');
+  console.log('🍯 Agentic Honey-Pot API Server v2.0 (FIXED)');
   console.log('━'.repeat(50));
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`🌐 URL: http://localhost:${PORT}`);
@@ -511,10 +534,11 @@ app.listen(PORT, () => {
   console.log(`🤖 OpenRouter API: ${process.env.OPENROUTER_API_KEY ? '✓ Configured' : '✗ Missing'}`);
   console.log(`🎯 AI Model: ${process.env.AI_MODEL || 'anthropic/claude-3.5-sonnet'}`);
   console.log('━'.repeat(50));
-  console.log('\nEndpoints:');
-  console.log('  GET  /health');
-  console.log('  POST /api/message');
-  console.log('  GET  /api/conversation/:id');
+  console.log('\n✨ Changes in v2.0:');
+  console.log('  • Fixed response structure for validator compatibility');
+  console.log('  • Added extractionCompleteness metric');
+  console.log('  • Improved error messages');
+  console.log('  • Optimized token usage');
   console.log('━'.repeat(50));
 });
 
