@@ -324,9 +324,20 @@ app.get('/', (req, res) => {
 // Main message handling endpoint
 app.post('/api/message', authenticateAPIKey, async (req, res) => {
   try {
-    console.log('📥 Request Body:', JSON.stringify(req.body, null, 2));
+        // ADD THESE LINES:
+    console.log('━'.repeat(50));
+    console.log('📥 FULL REQUEST DEBUG');
+    console.log('━'.repeat(50));
+    console.log('Body Type:', typeof req.body);
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+    console.log('Message Field:', req.body.message);
+    console.log('Message Type:', typeof req.body.message);
+    console.log('━'.repeat(50));
     
     const { conversationId, message, timestamp } = req.body;
+
+    
+    
 
     // FIX: Better validation for message field
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
