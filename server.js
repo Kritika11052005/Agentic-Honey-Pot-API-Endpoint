@@ -334,22 +334,19 @@ app.post('/api/message', authenticateAPIKey, async (req, res) => {
     console.log('Message Type:', typeof req.body.message);
     console.log('━'.repeat(50));
     
-    const { conversationId, message, timestamp } = req.body;
-
+    // Extract BOTH message and text fields
+    const { conversationId, message, text, timestamp } = req.body;
     
-    
+    // Accept EITHER 'message' OR 'text' field
+    const userMessage = message || text;
 
-    // FIX: Better validation for message field
-    if (!message || typeof message !== 'string' || message.trim().length === 0) {
-      console.log('❌ Invalid message field:', typeof message, message);
+    // Validate
+    if (!userMessage || typeof userMessage !== 'string' || userMessage.trim().length === 0) {
+      console.log('❌ Invalid message field:', typeof userMessage, userMessage);
       return res.status(400).json({
         success: false,
-        error: 'Missing required field: message',
-        message: 'The "message" field must be a non-empty string',
-        received: {
-          type: typeof message,
-          value: message
-        }
+        error: 'Missing required field: message or text',
+        message: 'The "message" or "text" field must be a non-empty string'
       });
     }
 
