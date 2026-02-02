@@ -324,34 +324,40 @@ app.get('/', (req, res) => {
 // Main message handling endpoint
 app.post('/api/message', authenticateAPIKey, async (req, res) => {
   try {
-        // ADD THESE LINES:
-    console.log('━'.repeat(50));
-    console.log('📥 FULL REQUEST DEBUG');
-    console.log('━'.repeat(50));
-    console.log('Body Type:', typeof req.body);
-    console.log('Body:', JSON.stringify(req.body, null, 2));
-    console.log('Message Field:', req.body.message);
-    console.log('Message Type:', typeof req.body.message);
-    console.log('━'.repeat(50));
+    console.log('📥 Request Body:', JSON.stringify(req.body, null, 2));
     
-    // Extract BOTH message and text fields
-    const { conversationId, message, text, timestamp } = req.body;
+    const { sessionId, conversationId, message, conversationHistory, metadata } = req.body;
+
+    // FIX: Handle nested message structure (message.text) or direct string
+    let userMessage;
+    let messageTimestamp;
     
-    // Accept EITHER 'message' OR 'text' field
-    const userMessage = message || text;
+    if (typeof message === 'object' && message !== null) {
+      // Validator sends: { message: { text: "...", sender: "...", timestamp: ... } }
+      userMessage = message.text;
+      messageTimestamp = message.timestamp;
+    } else if (typeof message === 'string') {
+      // Direct string: { message: "..." }
+      userMessage = message;
+      messageTimestamp = req.body.timestamp;
+    }
 
     // Validate
     if (!userMessage || typeof userMessage !== 'string' || userMessage.trim().length === 0) {
-      console.log('❌ Invalid message field:', typeof userMessage, userMessage);
+      console.log('❌ Invalid message field:', typeof message, message);
       return res.status(400).json({
         success: false,
-        error: 'Missing required field: message or text',
-        message: 'The "message" or "text" field must be a non-empty string'
+        error: 'Missing required field: message',
+        message: 'The "message" field or "message.text" must be a non-empty string',
+        received: {
+          type: typeof message,
+          value: message
+        }
       });
     }
 
-    // Generate conversation ID if not provided
-    const convId = conversationId || `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate conversation ID if not provided (use sessionId if available)
+    const convId = sessionId || conversationId || `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Get or create conversation history
     if (!conversations.has(convId)) {
@@ -379,7 +385,7 @@ app.post('/api/message', authenticateAPIKey, async (req, res) => {
     const startTime = Date.now();
 
     // Step 1: Detect scam intent
-    const scamDetection = ScamDetector.detect(message);
+    const scamDetection = ScamDetector.detect(userMessage);
     
     if (scamDetection.isScam && !conversation.scamDetected) {
       conversation.scamDetected = true;
@@ -388,7 +394,7 @@ app.post('/api/message', authenticateAPIKey, async (req, res) => {
     }
 
     // Step 2: Extract intelligence from message
-    const extractedIntel = IntelligenceExtractor.extract(message);
+    const extractedIntel = IntelligenceExtractor.extract(userMessage);
     
     // Merge new intelligence with existing
     Object.keys(extractedIntel).forEach(key => {
@@ -400,8 +406,8 @@ app.post('/api/message', authenticateAPIKey, async (req, res) => {
     // Step 3: Add user message to history
     conversation.messages.push({
       role: 'user',
-      content: message,
-      timestamp: timestamp || new Date().toISOString()
+      content: userMessage,
+      timestamp: messageTimestamp || new Date().toISOString()
     });
 
     // Step 4: Generate AI response
@@ -412,7 +418,7 @@ app.post('/api/message', authenticateAPIKey, async (req, res) => {
       console.log('🤖 Generating agentic AI response...');
       aiResponse = await AgenticHandler.generateResponse(
         conversation.messages,
-        message,
+        userMessage,
         scamDetection
       );
     } else {
