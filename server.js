@@ -340,7 +340,7 @@ app.post('/api/message', authenticateAPIKey, async (req, res) => {
 
     console.log('✅ Response sent');
     console.log('📊 Turn:', conv.metrics.turnCount);
-
+    console.log('📤 Sending response:', JSON.stringify({ status: "success", reply: aiReply }));
     // RETURN CORRECT FORMAT
     res.json({
       status: "success",
