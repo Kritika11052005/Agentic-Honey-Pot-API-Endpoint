@@ -146,7 +146,7 @@ class AgenticHandler {
             'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
             'X-Title': 'Honeypot API'
           },
-          timeout: 8000
+          timeout: 5000
         }
       );
 
