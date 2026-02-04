@@ -14,7 +14,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-
+app.options("/api/message", cors());
 // IMPORTANT:
 // Do NOT use express.json() globally (breaks GUVI tester empty-body check)
 
