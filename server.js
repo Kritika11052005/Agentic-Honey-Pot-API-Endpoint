@@ -1,6 +1,12 @@
 /**
- * Agentic Honey-Pot API Server - FINAL PRODUCTION VERSION
- * Based on actual validator testing - this WILL work!
+ * Agentic Honey-Pot API Server - CORRECT FORMAT
+ * Based on OFFICIAL Problem Statement
+ * 
+ * Expected Response:
+ * {
+ *   "status": "success",
+ *   "reply": "Agent's response text here"
+ * }
  */
 
 require('dotenv').config();
@@ -26,37 +32,28 @@ const authenticateAPIKey = (req, res, next) => {
   const apiKey = req.headers['x-api-key'] || req.headers['authorization'];
   
   console.log('━'.repeat(50));
-  console.log('🔑 API Key Authentication Debug');
+  console.log('🔑 API Key Authentication');
   console.log('━'.repeat(50));
-  console.log('Received API Key:', apiKey || 'NONE');
-  console.log('Expected API Key:', process.env.API_KEY || 'NOT SET');
+  console.log('Received:', apiKey ? '✓' : '✗');
   
   if (!apiKey) {
-    console.log('❌ Result: Missing API key');
-    console.log('━'.repeat(50));
     return res.status(401).json({
-      error: 'MISSING_API_KEY',
-      message: 'Please provide API key in X-API-Key header'
+      status: "error",
+      message: "Missing API key"
     });
   }
 
   const cleanKey = apiKey.replace(/^Bearer\s+/i, '').trim();
   const expectedKey = (process.env.API_KEY || '').trim();
   
-  console.log('Clean Key (trimmed):', `"${cleanKey}"`);
-  console.log('Expected Key (trimmed):', `"${expectedKey}"`);
-  console.log('Keys Match:', cleanKey === expectedKey);
-  
   if (cleanKey !== expectedKey) {
-    console.log('❌ Result: Invalid API key');
-    console.log('━'.repeat(50));
     return res.status(403).json({
-      error: 'INVALID_API_KEY',
-      message: 'The provided API key is not valid'
+      status: "error",
+      message: "Invalid API key"
     });
   }
 
-  console.log('✅ Result: Authentication successful');
+  console.log('✅ Authentication successful');
   console.log('━'.repeat(50));
   next();
 };
@@ -89,7 +86,7 @@ class ScamDetector {
     const isScam = scamScore >= 2;
     const confidence = Math.min((scamScore / 5) * 100, 100);
 
-    return { isScam, confidence: Math.round(confidence) };
+    return { isScam, confidence: Math.round(confidence), scamScore };
   }
 }
 
@@ -99,37 +96,21 @@ class ScamDetector {
 class IntelligenceExtractor {
   static patterns = {
     bankAccount: /\b\d{9,18}\b/g,
-    upiId: /\b[\w\.\-]+@[\w\-]+\b/g,
+    upiId: /\b[\w\.\-]+@(paytm|ybl|oksbi|okhdfcbank|okicici|okaxis)\b/gi,
     phoneNumber: /\b[6-9]\d{9}\b/g,
     url: /(https?:\/\/[^\s]+)/g,
-    ifscCode: /\b[A-Z]{4}0[A-Z0-9]{6}\b/g,
-    email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g
+    keyword: /\b(urgent|verify|immediately|blocked|suspended|otp|account|bank)\b/gi
   };
 
   static extract(text) {
     if (typeof text !== 'string') text = String(text);
-
     return {
       bankAccounts: [...new Set((text.match(this.patterns.bankAccount) || []))],
-      upiIds: [...new Set((text.match(this.patterns.upiId) || []).filter(id => 
-        ['@paytm', '@ybl', '@oksbi', '@okhdfcbank', '@okicici', '@okaxis'].some(p => 
-          id.toLowerCase().includes(p)
-        )
-      ))],
+      upiIds: [...new Set((text.match(this.patterns.upiId) || []))],
       phoneNumbers: [...new Set((text.match(this.patterns.phoneNumber) || []))],
       phishingLinks: [...new Set((text.match(this.patterns.url) || []))],
-      ifscCodes: [...new Set((text.match(this.patterns.ifscCode) || []))],
-      emails: [...new Set((text.match(this.patterns.email) || []))]
+      suspiciousKeywords: [...new Set((text.match(this.patterns.keyword) || []).map(k => k.toLowerCase()))]
     };
-  }
-
-  static calculateCompleteness(intelligence) {
-    const weights = { bankAccounts: 30, upiIds: 25, phishingLinks: 20, phoneNumbers: 15, ifscCodes: 5, emails: 5 };
-    let score = 0;
-    Object.keys(weights).forEach(key => {
-      if (intelligence[key]?.length > 0) score += weights[key];
-    });
-    return score / 100;
   }
 }
 
@@ -139,7 +120,7 @@ class IntelligenceExtractor {
 class AgenticHandler {
   static async generateResponse(history, userMessage, scamContext) {
     try {
-      const systemPrompt = `You are a honeypot AI engaging with scammers. Act as a naive, tech-unsavvy person who is concerned but willing to help. Extract bank accounts, UPI IDs, and phishing links by asking clarifying questions. NEVER reveal you know this is a scam. Keep responses under 80 words.`;
+      const systemPrompt = `You are a honeypot AI engaging with scammers. Act as a naive, tech-unsavvy person who is concerned but willing to help. Extract bank accounts, UPI IDs, and phishing links by asking clarifying questions. NEVER reveal you know this is a scam. Keep responses under 60 words and natural.`;
       
       const messages = [
         { role: 'system', content: systemPrompt },
@@ -155,7 +136,7 @@ class AgenticHandler {
         {
           model: process.env.AI_MODEL || 'anthropic/claude-3.5-sonnet',
           messages: messages,
-          max_tokens: 150,
+          max_tokens: 120,
           temperature: 0.7
         },
         {
@@ -165,22 +146,60 @@ class AgenticHandler {
             'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
             'X-Title': 'Honeypot API'
           },
-          timeout: 10000
+          timeout: 8000
         }
       );
 
-      return response.data.choices[0].message.content;
+      return response.data.choices[0].message.content.trim();
     } catch (error) {
       console.error('AI Error:', error.message);
       const fallbacks = [
-        "Oh, I see. Can you provide more details? I want to understand correctly.",
-        "This sounds important. What exactly do I need to do? Can you send the link?",
-        "I'm confused. Could you explain the steps again? What information do you need?",
-        "Okay, I want to help. Do you have a website or phone number to verify this?",
-        "I received your message. Please share the account number or UPI ID details."
+        "Oh no, this is concerning! What should I do? Can you help me understand what's happening?",
+        "I'm worried about my account. Which bank is this for? What steps do I need to follow?",
+        "This sounds urgent. Could you please send me the link or number where I should verify?",
+        "I want to fix this. What information do you need from me to resolve this issue?",
+        "I'm not very tech-savvy. Can you guide me through the verification process step by step?"
       ];
       return fallbacks[Math.floor(Math.random() * fallbacks.length)];
     }
+  }
+}
+
+// ============================================
+// CALLBACK TO GUVI PLATFORM
+// ============================================
+async function sendFinalResultToGUVI(sessionData) {
+  try {
+    const payload = {
+      sessionId: sessionData.id,
+      scamDetected: sessionData.scamDetected,
+      totalMessagesExchanged: sessionData.metrics.turnCount,
+      extractedIntelligence: {
+        bankAccounts: sessionData.intelligence.bankAccounts,
+        upiIds: sessionData.intelligence.upiIds,
+        phishingLinks: sessionData.intelligence.phishingLinks,
+        phoneNumbers: sessionData.intelligence.phoneNumbers,
+        suspiciousKeywords: sessionData.intelligence.suspiciousKeywords
+      },
+      agentNotes: sessionData.agentNotes || "Scam engagement completed"
+    };
+
+    console.log('📤 Sending final result to GUVI platform...');
+    
+    const response = await axios.post(
+      'https://hackathon.guvi.in/api/updateHoneyPotFinalResult',
+      payload,
+      {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 5000
+      }
+    );
+
+    console.log('✅ Final result sent to GUVI:', response.status);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send final result to GUVI:', error.message);
+    return false;
   }
 }
 
@@ -190,55 +209,47 @@ class AgenticHandler {
 
 app.get('/health', (req, res) => {
   res.json({
-    status: 'healthy',
-    service: 'Agentic Honey-Pot API',
-    version: '3.0.0',
-    timestamp: new Date().toISOString()
+    status: "success",
+    message: "Honeypot API is healthy",
+    version: "4.0.0"
   });
 });
 
 app.get('/', (req, res) => {
   res.json({
-    message: 'Agentic Honey-Pot API is running',
-    version: '3.0.0',
-    endpoints: {
-      health: 'GET /health',
-      message: 'POST /api/message'
-    }
+    status: "success",
+    message: "Agentic Honey-Pot API",
+    version: "4.0.0"
   });
 });
 
-// MAIN ENDPOINT - PRODUCTION VERSION
+// MAIN ENDPOINT - CORRECT FORMAT
 app.post('/api/message', authenticateAPIKey, async (req, res) => {
   try {
-    console.log('📥 Request Body:', JSON.stringify(req.body, null, 2));
+    console.log('📥 Request:', JSON.stringify(req.body, null, 2));
     
-    const { sessionId, conversationId, message, conversationHistory, metadata } = req.body;
+    const { sessionId, message, conversationHistory, metadata } = req.body;
 
     // Extract message
-    let userMessage;
-    let messageTimestamp;
-    
+    let userMessage, messageTimestamp;
     if (typeof message === 'object' && message !== null) {
       userMessage = message.text;
       messageTimestamp = message.timestamp;
     } else if (typeof message === 'string') {
       userMessage = message;
-      messageTimestamp = req.body.timestamp || Date.now();
+      messageTimestamp = Date.now();
     }
 
     // Validation
     if (!userMessage || typeof userMessage !== 'string' || userMessage.trim().length === 0) {
-      console.log('❌ Invalid message field');
-      // CRITICAL: Don't include "success: false" - validator rejects it
       return res.status(400).json({
-        error: 'INVALID_REQUEST_BODY',
-        message: 'Missing or invalid message field'
+        status: "error",
+        message: "Invalid message field"
       });
     }
 
-    // Generate conversation ID
-    const convId = sessionId || conversationId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate session ID
+    const convId = sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Get or create conversation
     if (!conversations.has(convId)) {
@@ -252,119 +263,97 @@ app.post('/api/message', authenticateAPIKey, async (req, res) => {
           upiIds: [],
           phoneNumbers: [],
           phishingLinks: [],
-          ifscCodes: [],
-          emails: []
+          suspiciousKeywords: []
         },
-        metrics: { turnCount: 0, engagementDuration: 0 }
+        metrics: { turnCount: 0, engagementDuration: 0 },
+        agentNotes: ""
       });
     }
 
-    const conversation = conversations.get(convId);
+    const conv = conversations.get(convId);
 
     // Detect scam
-    const scamDetection = ScamDetector.detect(userMessage);
-    if (scamDetection.isScam && !conversation.scamDetected) {
-      conversation.scamDetected = true;
-      console.log('🚨 Scam detected! Confidence:', scamDetection.confidence + '%');
+    const detection = ScamDetector.detect(userMessage);
+    if (detection.isScam && !conv.scamDetected) {
+      conv.scamDetected = true;
+      console.log('🚨 Scam detected! Confidence:', detection.confidence + '%');
     }
 
     // Extract intelligence
     const intel = IntelligenceExtractor.extract(userMessage);
     Object.keys(intel).forEach(key => {
-      conversation.intelligence[key] = [...new Set([...conversation.intelligence[key], ...intel[key]])];
+      conv.intelligence[key] = [...new Set([...conv.intelligence[key], ...intel[key]])];
     });
 
     // Add user message
-    conversation.messages.push({
+    conv.messages.push({
       role: 'user',
       content: userMessage,
       timestamp: messageTimestamp || Date.now()
     });
 
     // Generate AI response
-    let aiResponse;
-    if (conversation.scamDetected) {
-      console.log('🤖 Generating agentic AI response...');
-      aiResponse = await AgenticHandler.generateResponse(
-        conversation.messages,
+    let aiReply;
+    if (conv.scamDetected) {
+      console.log('🤖 Generating AI response...');
+      aiReply = await AgenticHandler.generateResponse(
+        conv.messages,
         userMessage,
-        scamDetection
+        detection
       );
     } else {
-      aiResponse = "Hello! How can I help you today?";
+      aiReply = "Hello! How can I help you?";
     }
 
-    // Add AI response
-    const responseTime = Date.now();
-    conversation.messages.push({
+    // Add AI response to conversation
+    conv.messages.push({
       role: 'assistant',
-      content: aiResponse,
-      timestamp: responseTime
+      content: aiReply,
+      timestamp: Date.now()
     });
 
     // Update metrics
-    conversation.metrics.turnCount++;
-    conversation.metrics.engagementDuration = responseTime - conversation.startTime;
+    conv.metrics.turnCount++;
+    conv.metrics.engagementDuration = Date.now() - conv.startTime;
 
-    // Calculate completeness
-    const completeness = IntelligenceExtractor.calculateCompleteness(conversation.intelligence);
+    // Update agent notes
+    if (conv.scamDetected) {
+      conv.agentNotes = `Scam detected with ${detection.confidence}% confidence. Engaged for ${conv.metrics.turnCount} turns.`;
+    }
 
-    // CRITICAL: Build response in EXACT order expected by validator
-    const response = {
-      sessionId: convId,
-      scamDetected: conversation.scamDetected,
-      confidence: scamDetection.confidence / 100,
-      agentResponse: {
-        text: aiResponse,
-        sender: "agent",
-        timestamp: responseTime
-      },
-      extractedIntelligence: {
-        bankAccounts: conversation.intelligence.bankAccounts,
-        upiIds: conversation.intelligence.upiIds,
-        phishingLinks: conversation.intelligence.phishingLinks,
-        phoneNumbers: conversation.intelligence.phoneNumbers,
-        other: {
-          ifscCodes: conversation.intelligence.ifscCodes,
-          emails: conversation.intelligence.emails
-        }
-      },
-      conversationMetrics: {
-        turnCount: conversation.metrics.turnCount,
-        engagementDuration: conversation.metrics.engagementDuration,
-        extractionCompleteness: completeness
-      }
-    };
+    // Check if we should send final result to GUVI
+    // Send after 5+ turns or if significant intelligence extracted
+    const shouldSendFinal = conv.scamDetected && (
+      conv.metrics.turnCount >= 5 ||
+      conv.intelligence.bankAccounts.length > 0 ||
+      conv.intelligence.upiIds.length > 0 ||
+      conv.intelligence.phishingLinks.length > 0
+    );
 
-    console.log('✅ Response sent successfully');
-    console.log('📊 Metrics: { turns: ' + conversation.metrics.turnCount + 
-                ', duration: \'' + conversation.metrics.engagementDuration + 'ms\'' + 
-                ', completeness: ' + completeness + ' }');
+    if (shouldSendFinal && !conv.finalResultSent) {
+      conv.finalResultSent = true;
+      // Send asynchronously (don't wait for it)
+      sendFinalResultToGUVI(conv).catch(err => 
+        console.error('Background GUVI callback failed:', err)
+      );
+    }
 
-    // Send response
-    res.json(response);
+    console.log('✅ Response sent');
+    console.log('📊 Turn:', conv.metrics.turnCount);
+
+    // RETURN CORRECT FORMAT
+    res.json({
+      status: "success",
+      reply: aiReply
+    });
 
   } catch (error) {
     console.error('❌ Error:', error);
     res.status(500).json({
-      error: 'INTERNAL_SERVER_ERROR',
+      status: "error",
       message: error.message
     });
   }
-});
-
-// Get conversation endpoint
-app.get('/api/conversation/:id', authenticateAPIKey, (req, res) => {
-  const convId = req.params.id;
-  
-  if (!conversations.has(convId)) {
-    return res.status(404).json({
-      error: 'NOT_FOUND',
-      message: 'Conversation not found'
-    });
-  }
-
-  res.json(conversations.get(convId));
 });
 
 // ============================================
@@ -372,12 +361,13 @@ app.get('/api/conversation/:id', authenticateAPIKey, (req, res) => {
 // ============================================
 app.listen(PORT, () => {
   console.log('━'.repeat(50));
-  console.log('🍯 Agentic Honey-Pot API v3.0 (Production)');
+  console.log('🍯 Agentic Honey-Pot API v4.0 (CORRECT FORMAT)');
   console.log('━'.repeat(50));
   console.log(`✅ Server: http://localhost:${PORT}`);
-  console.log(`🔑 API Key: ${process.env.API_KEY ? '✓ Configured' : '✗ Missing'}`);
-  console.log(`🤖 OpenRouter: ${process.env.OPENROUTER_API_KEY ? '✓ Configured' : '✗ Missing'}`);
-  console.log(`🎯 AI Model: ${process.env.AI_MODEL || 'anthropic/claude-3.5-sonnet'}`);
+  console.log(`🔑 API Key: ${process.env.API_KEY ? '✓' : '✗'}`);
+  console.log(`🤖 OpenRouter: ${process.env.OPENROUTER_API_KEY ? '✓' : '✗'}`);
+  console.log('━'.repeat(50));
+  console.log('Response Format: { status: "success", reply: "..." }');
   console.log('━'.repeat(50));
 });
 
