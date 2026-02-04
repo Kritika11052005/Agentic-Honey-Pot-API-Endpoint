@@ -1,6 +1,7 @@
 /**
- * Agentic Honey-Pot API Server - GUVI SAFE FINAL VERSION
- * Response format (STRICT):
+ * Agentic Honey-Pot API Server
+ * GUVI FINAL SAFE VERSION
+ * STRICT RESPONSE FORMAT:
  * {
  *   "status": "success",
  *   "reply": "..."
@@ -15,43 +16,62 @@ const axios = require("axios");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-/* ───────────────────────── Middleware ───────────────────────── */
+/* ────────────────────── GLOBAL MIDDLEWARE ────────────────────── */
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* ───────────────────────── In-memory store ───────────────────────── */
+// ✅ VERY IMPORTANT: allow preflight for browser tester
+app.options("*", cors());
+
+/* ────────────────────── MEMORY STORE ────────────────────── */
 
 const conversations = new Map();
 
-/* ───────────────────────── API KEY AUTH ───────────────────────── */
+/* ────────────────────── API KEY AUTH ────────────────────── */
 
 const authenticateAPIKey = (req, res, next) => {
-  const apiKey = req.headers["x-api-key"];
-  if (!apiKey || apiKey.trim() !== process.env.API_KEY) {
-    return res.status(403).json({ status: "error", message: "Invalid API key" });
+  // ✅ Allow OPTIONS preflight (GUVI tester)
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
   }
+
+  const apiKey = req.headers["x-api-key"];
+
+  if (!apiKey || apiKey.trim() !== process.env.API_KEY) {
+    return res.status(403).json({
+      status: "error",
+      message: "Invalid API key"
+    });
+  }
+
   next();
 };
 
-/* ───────────────────────── Scam Detection ───────────────────────── */
+/* ────────────────────── SCAM DETECTION ────────────────────── */
 
 class ScamDetector {
   static patterns = [
-    /\b(urgent|immediately|blocked|verify|suspended|otp|account|bank)\b/i,
-    /\b(click|link|http|https)\b/i,
-    /\b(upi|paytm|gpay|phonepe|account number)\b/i
+    /\b(urgent|immediately|blocked|verify|suspended)\b/i,
+    /\b(otp|pin|password|account|bank)\b/i,
+    /\b(upi|paytm|gpay|phonepe)\b/i,
+    /\b(click|link|http|https)\b/i
   ];
 
   static detect(text) {
     let score = 0;
-    for (const p of this.patterns) if (p.test(text)) score++;
-    return { isScam: score >= 2, confidence: score / this.patterns.length };
+    for (const p of this.patterns) {
+      if (p.test(text)) score++;
+    }
+    return {
+      isScam: score >= 2,
+      confidence: score / this.patterns.length
+    };
   }
 }
 
-/* ───────────────────────── Intelligence Extraction ───────────────────────── */
+/* ────────────────────── INTELLIGENCE EXTRACTION ────────────────────── */
 
 class IntelligenceExtractor {
   static extract(text) {
@@ -65,10 +85,10 @@ class IntelligenceExtractor {
   }
 }
 
-/* ───────────────────────── AI Handler ───────────────────────── */
+/* ────────────────────── AI AGENT ────────────────────── */
 
 class AgenticHandler {
-  static async respond(history, message) {
+  static async respond(history, userMessage) {
     try {
       const response = await axios.post(
         "https://openrouter.ai/api/v1/chat/completions",
@@ -78,13 +98,13 @@ class AgenticHandler {
             {
               role: "system",
               content:
-                "You are a naive human responding to a possible scam. Ask simple questions. Never reveal suspicion."
+                "You are a naive human. Ask simple clarification questions. Never reveal suspicion."
             },
             ...history.map(m => ({
               role: m.role === "user" ? "user" : "assistant",
               content: m.content
             })),
-            { role: "user", content: message }
+            { role: "user", content: userMessage }
           ],
           max_tokens: 80
         },
@@ -104,7 +124,7 @@ class AgenticHandler {
   }
 }
 
-/* ───────────────────────── GUVI CALLBACK ───────────────────────── */
+/* ────────────────────── GUVI CALLBACK ────────────────────── */
 
 async function sendFinalResult(session) {
   try {
@@ -119,34 +139,43 @@ async function sendFinalResult(session) {
       },
       { timeout: 5000 }
     );
-  } catch (e) {
+  } catch (err) {
     console.error("GUVI callback failed");
   }
 }
 
-/* ───────────────────────── ROUTES ───────────────────────── */
+/* ────────────────────── ROUTES ────────────────────── */
 
-/* Health */
-app.get("/", (_, res) =>
-  res.json({ status: "success", reply: "Agentic Honey-Pot API" })
-);
+app.get("/", (_, res) => {
+  res.json({
+    status: "success",
+    reply: "Agentic Honey-Pot API"
+  });
+});
 
-/* MAIN ENDPOINT */
+/* ────────────────────── MAIN ENDPOINT ────────────────────── */
+
 app.post("/api/message", authenticateAPIKey, async (req, res) => {
-  /* ✅ ALLOW EMPTY BODY (TESTER UI) */
+  // ✅ Tester sends EMPTY body
   if (!req.body || Object.keys(req.body).length === 0) {
-    return res.json({ status: "success", reply: "Hello" });
+    return res.json({
+      status: "success",
+      reply: "Hello"
+    });
   }
 
   const { sessionId, message } = req.body;
   const userText = message?.text;
 
   if (!userText) {
-    return res.json({ status: "success", reply: "Hello" });
+    return res.json({
+      status: "success",
+      reply: "Hello"
+    });
   }
 
-  /* Session */
-  const id = sessionId || `sess_${Date.now()}`;
+  const id = sessionId || `session_${Date.now()}`;
+
   if (!conversations.has(id)) {
     conversations.set(id, {
       id,
@@ -166,20 +195,20 @@ app.post("/api/message", authenticateAPIKey, async (req, res) => {
 
   const session = conversations.get(id);
 
-  /* Detect scam */
   const detection = ScamDetector.detect(userText);
   if (detection.isScam) session.scamDetected = true;
 
-  /* Extract intelligence */
   const intel = IntelligenceExtractor.extract(userText);
-  Object.keys(intel).forEach(k => {
-    session.intelligence[k] = [...new Set([...session.intelligence[k], ...intel[k]])];
+  Object.keys(intel).forEach(key => {
+    session.intelligence[key] = [
+      ...new Set([...session.intelligence[key], ...intel[key]])
+    ];
   });
 
   session.messages.push({ role: "user", content: userText });
   session.turns++;
 
-  /* ⚡ FIRST TURN = NO LLM (FAST) */
+  // ⚡ FIRST TURN → NO LLM (FAST RESPONSE)
   let reply;
   if (session.turns === 1) {
     reply = "Why is my account being blocked?";
@@ -189,7 +218,7 @@ app.post("/api/message", authenticateAPIKey, async (req, res) => {
 
   session.messages.push({ role: "assistant", content: reply });
 
-  /* Final callback */
+  // Final GUVI callback
   if (
     session.scamDetected &&
     !session.finalSent &&
@@ -201,14 +230,14 @@ app.post("/api/message", authenticateAPIKey, async (req, res) => {
     sendFinalResult(session);
   }
 
-  /* ✅ STRICT RESPONSE FORMAT */
+  // ✅ STRICT FORMAT (NO EXTRA FIELDS)
   return res.json({
     status: "success",
     reply
   });
 });
 
-/* ───────────────────────── START ───────────────────────── */
+/* ────────────────────── START SERVER ────────────────────── */
 
 app.listen(PORT, () => {
   console.log("🍯 Agentic Honey-Pot API running on port", PORT);
