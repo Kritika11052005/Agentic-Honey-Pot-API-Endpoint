@@ -1,11 +1,6 @@
 /**
  * Agentic Honey-Pot API Server
- * GUVI FINAL SAFE VERSION
- * STRICT RESPONSE FORMAT:
- * {
- *   "status": "success",
- *   "reply": "..."
- * }
+ * FINAL EXPRESS-5 / NODE-22 SAFE VERSION
  */
 
 require("dotenv").config();
@@ -18,12 +13,9 @@ const PORT = process.env.PORT || 3000;
 
 /* ────────────────────── GLOBAL MIDDLEWARE ────────────────────── */
 
-app.use(cors());
+app.use(cors()); // ✅ Handles preflight correctly in Express 5
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// ✅ VERY IMPORTANT: allow preflight for browser tester
-app.options("*", cors());
 
 /* ────────────────────── MEMORY STORE ────────────────────── */
 
@@ -32,7 +24,7 @@ const conversations = new Map();
 /* ────────────────────── API KEY AUTH ────────────────────── */
 
 const authenticateAPIKey = (req, res, next) => {
-  // ✅ Allow OPTIONS preflight (GUVI tester)
+  // ✅ VERY IMPORTANT: allow OPTIONS preflight
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
   }
@@ -98,7 +90,7 @@ class AgenticHandler {
             {
               role: "system",
               content:
-                "You are a naive human. Ask simple clarification questions. Never reveal suspicion."
+                "You are a naive human responding to a possible scam. Ask simple clarification questions."
             },
             ...history.map(m => ({
               role: m.role === "user" ? "user" : "assistant",
@@ -139,7 +131,7 @@ async function sendFinalResult(session) {
       },
       { timeout: 5000 }
     );
-  } catch (err) {
+  } catch {
     console.error("GUVI callback failed");
   }
 }
@@ -156,7 +148,7 @@ app.get("/", (_, res) => {
 /* ────────────────────── MAIN ENDPOINT ────────────────────── */
 
 app.post("/api/message", authenticateAPIKey, async (req, res) => {
-  // ✅ Tester sends EMPTY body
+  // ✅ Tester sends empty body
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.json({
       status: "success",
@@ -208,7 +200,7 @@ app.post("/api/message", authenticateAPIKey, async (req, res) => {
   session.messages.push({ role: "user", content: userText });
   session.turns++;
 
-  // ⚡ FIRST TURN → NO LLM (FAST RESPONSE)
+  // ⚡ FIRST TURN = NO LLM
   let reply;
   if (session.turns === 1) {
     reply = "Why is my account being blocked?";
@@ -218,7 +210,6 @@ app.post("/api/message", authenticateAPIKey, async (req, res) => {
 
   session.messages.push({ role: "assistant", content: reply });
 
-  // Final GUVI callback
   if (
     session.scamDetected &&
     !session.finalSent &&
@@ -230,14 +221,13 @@ app.post("/api/message", authenticateAPIKey, async (req, res) => {
     sendFinalResult(session);
   }
 
-  // ✅ STRICT FORMAT (NO EXTRA FIELDS)
   return res.json({
     status: "success",
     reply
   });
 });
 
-/* ────────────────────── START SERVER ────────────────────── */
+/* ────────────────────── START ────────────────────── */
 
 app.listen(PORT, () => {
   console.log("🍯 Agentic Honey-Pot API running on port", PORT);
