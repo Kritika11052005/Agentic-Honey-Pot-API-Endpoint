@@ -21,6 +21,7 @@ const { generateAgentReply }                   = require("./src/agentReply");
 const { submitFinalResult }                    = require("./src/finalSubmit");
 
 const app  = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 /* ─────────────────────────── CORS ─────────────────────────── */
