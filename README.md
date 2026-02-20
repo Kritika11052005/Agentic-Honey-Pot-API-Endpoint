@@ -2,25 +2,26 @@
 
 ![Node.js](https://img.shields.io/badge/Node.js-18.x-339933?style=for-the-badge&logo=node.js&logoColor=white)
 ![Express.js](https://img.shields.io/badge/Express.js-4.x-000000?style=for-the-badge&logo=express&logoColor=white)
+![Gemini](https://img.shields.io/badge/Google_Gemini-2.5_Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
 ![Status](https://img.shields.io/badge/Status-Active-success?style=for-the-badge)
 
-AI-powered honeypot system for detecting and engaging with scammers using advanced pattern recognition and autonomous AI agents.
+AI-powered honeypot system for detecting and engaging with scammers using advanced pattern recognition and an autonomous AI agent persona.
 
 ---
 
 ## 🎯 Project Overview
 
-**Agentic Honey-Pot API** is an intelligent scam detection and engagement system built for the **HCL GUVI India Impact AI Buildathon**. It autonomously detects scam attempts, engages with scammers using AI-powered conversations, and extracts critical intelligence for law enforcement.
+**Agentic Honey-Pot API** is an intelligent scam detection and engagement system built for the **HCL GUVI India Impact AI Buildathon**. It autonomously detects scam attempts, engages with scammers using a convincing AI-powered victim persona ("Ramesh"), and extracts critical intelligence for law enforcement.
 
 ### Key Features
 
-- 🔍 **Real-time Scam Detection** - Pattern-based detection with 80%+ confidence scoring
-- 🤖 **Agentic AI Engagement** - Powered by Claude 3.5 Sonnet via OpenRouter
-- 📊 **Intelligence Extraction** - Captures UPI IDs, phone numbers, bank accounts, and phishing URLs
-- 💬 **Conversation Tracking** - Maintains full conversation history with metrics
-- 🔐 **Secure API** - API key authentication for all endpoints
-- ⚡ **Fast Response** - Average response time ~4.5 seconds
+- 🔍 **Real-time Scam Detection** — 12-pattern regex engine with scam type classification
+- 🤖 **Agentic AI Engagement** — Powered by Google Gemini 2.5 Flash with rotating interrogation strategies
+- 📊 **Intelligence Extraction** — Captures UPI IDs, phone numbers, bank accounts, phishing URLs, emails, case IDs, policy numbers, and order numbers
+- 💬 **Multi-turn Conversation** — Session-based tracking with full conversation history
+- 🔐 **Secure API** — API key authentication via `x-api-key` header
+- ⚡ **Deadline-Aware** — 25s request budget with retry logic and fallback replies to stay within the 30s evaluator limit
 
 ---
 
@@ -28,29 +29,43 @@ AI-powered honeypot system for detecting and engaging with scammers using advanc
 
 - **Runtime**: Node.js 18.x
 - **Framework**: Express.js 4.x
-- **AI Provider**: OpenRouter (Claude 3.5 Sonnet)
-- **Authentication**: API Key-based
+- **AI Provider**: Google Gemini 2.5 Flash (`gemini-2.5-flash`)
+- **Authentication**: API Key-based (`x-api-key` header)
 - **Deployment**: Render.com
+
+---
+
+## 🏗️ Project Structure
+
+```
+honeypot-api/
+├── server.js               # Entry point — Express app, routing, session management
+├── src/
+│   ├── agentReply.js       # Gemini LLM integration, Ramesh persona, fallback replies
+│   ├── scamDetector.js     # 12-pattern scam detection + scam type classifier
+│   ├── intelExtractor.js   # Regex-based intelligence extraction & merging
+│   └── finalSubmit.js      # Posts final result to GUVI evaluation endpoint
+├── .env                    # Environment variables (never commit)
+├── .env.example            # Template for required environment variables
+├── package.json
+└── README.md
+```
 
 ---
 
 ## 📡 API Endpoints
 
-### Health Check
+### Root
 ```http
-GET /health
+GET /
 ```
-No authentication required. Returns server status.
+Returns a basic status response. No authentication required.
 
 **Response:**
 ```json
 {
-  "success": true,
-  "status": "healthy",
-  "service": "Agentic Honey-Pot API",
-  "version": "1.0.0",
-  "aiProvider": "OpenRouter",
-  "timestamp": "2026-02-02T08:26:42.093Z"
+  "status": "success",
+  "reply": "Agentic Honey-Pot API"
 }
 ```
 
@@ -58,65 +73,153 @@ No authentication required. Returns server status.
 ```http
 POST /api/message
 ```
+
 **Headers:**
 ```
-X-API-Key: YOUR_API_KEY
 Content-Type: application/json
+x-api-key: YOUR_API_KEY
 ```
 
 **Request Body:**
 ```json
 {
-  "conversationId": "conv_xxxxx", // Optional, auto-generated if not provided
-  "message": "Your bank account has been suspended",
-  "timestamp": "2026-02-02T08:26:42.093Z" // Optional
+  "sessionId": "uuid-v4-string",
+  "message": {
+    "sender": "scammer",
+    "text": "URGENT: Your SBI account has been compromised. Share your OTP immediately.",
+    "timestamp": "2025-02-11T10:30:00Z"
+  },
+  "conversationHistory": [
+    {
+      "sender": "scammer",
+      "text": "Previous scammer message...",
+      "timestamp": "1707645000000"
+    },
+    {
+      "sender": "user",
+      "text": "Previous honeypot response...",
+      "timestamp": "1707645005000"
+    }
+  ],
+  "metadata": {
+    "channel": "SMS",
+    "language": "English",
+    "locale": "IN"
+  }
 }
 ```
 
 **Response:**
 ```json
 {
-  "success": true,
-  "conversationId": "conv_1770020802092_4rhwbmm5n",
-  "response": "AI-generated response to engage the scammer",
-  "scamDetection": {
-    "detected": true,
-    "confidence": 80,
-    "scamScore": 4
-  },
-  "intelligence": {
-    "bankAccounts": ["9876543210"],
-    "upiIds": ["scammer@paytm"],
-    "phoneNumbers": ["9876543210"],
-    "urls": [],
-    "ifscCodes": [],
-    "emails": []
-  },
-  "metrics": {
-    "totalTurns": 2,
-    "engagementDuration": 8998,
-    "averageResponseTime": 4499
-  },
-  "timestamp": "2026-02-02T08:27:26.550Z"
+  "status": "success",
+  "reply": "Oh my god, is it really blocked? I am very worried. Before anything else, can you please tell me your name and your employee ID number so I can write it down?"
 }
 ```
 
-### Get Conversation Details
-```http
-GET /api/conversation/:id
-```
-**Headers:**
-```
-X-API-Key: YOUR_API_KEY
-```
+---
 
-### Get All Conversations
-```http
-GET /api/conversations
-```
-**Headers:**
-```
-X-API-Key: YOUR_API_KEY
+## 🧠 How It Works
+
+### 1. Scam Detection Engine (`scamDetector.js`)
+
+Detects scams using 12 regex patterns covering:
+
+| Pattern | Flag |
+|---|---|
+| urgent / act fast / emergency | Urgency language |
+| OTP / PIN / verification code | OTP/PIN request |
+| blocked / suspended / compromised | Account threat |
+| UPI / GPay / Paytm / NEFT | Payment platform |
+| click here / http / links | Suspicious link |
+| KYC / Aadhar / update details | KYC scam |
+| prize / cashback / lottery | Reward lure |
+| SBI / HDFC / RBI / IRDAI | Impersonation |
+| account number / CVV / card | Financial data request |
+| fee / advance / processing | Advance fee fraud |
+| fraud department / cyber cell | Authority impersonation |
+| package / courier / customs | Parcel scam |
+
+Every incoming message and conversation history entry is scanned. Red flags are deduplicated and accumulated across the session.
+
+### 2. Intelligence Extraction (`intelExtractor.js`)
+
+Extracts the following from every message:
+
+| Field | Extraction Method |
+|---|---|
+| `phoneNumbers` | `+91` or 10-digit Indian mobile regex |
+| `upiIds` | `handle@provider` (no TLD, excludes emails) |
+| `bankAccounts` | 9–18 digit numbers |
+| `phishingLinks` | `http(s)://` URLs |
+| `emailAddresses` | Standard email regex (with TLD) |
+| `caseIds` | Prefixes: case, ref, SR, ticket, CRN, URN |
+| `policyNumbers` | Prefixes: policy, pol no |
+| `orderNumbers` | Prefixes: order, txn, transaction, ref |
+
+All fields are merged and deduplicated across turns using `mergeIntel()`. Metadata from each request is also scanned.
+
+### 3. Agentic AI Engagement (`agentReply.js`)
+
+The agent plays **Ramesh** — a naive, 68-year-old retired government employee from Chennai who doesn't know he's being scammed.
+
+**Turn 1** always uses a fixed opener to save response time and ensure quality engagement.
+
+From Turn 2 onward, a Gemini 2.5 Flash prompt is built with:
+- Current intelligence status (what's been extracted vs. still missing)
+- Accumulated red flags
+- A **rotating interrogation strategy** (10 strategies cycling per turn) to extract more data
+- Last 10–12 messages as conversation history
+
+If Gemini fails or times out (up to 3 retries with exponential backoff within a 25s deadline), one of 10 **fallback replies** is returned — all designed to keep the scammer talking.
+
+**Sample interrogation strategies:**
+- Ask for full name and employee/badge ID
+- Request supervisor name and landline for callback verification
+- Ask for UPI ID or account number "to confirm the reversal"
+- Request official email for written confirmation
+- Express panic to draw out more details about the threat
+
+### 4. Session Management (`server.js`)
+
+Each session tracks:
+- Full message history
+- Turn count
+- Scam detection state and red flag list
+- Accumulated intelligence
+- Whether the final result has been submitted
+
+### 5. Final Submission (`finalSubmit.js`)
+
+A final result is submitted automatically (fire-and-forget) to the GUVI evaluation endpoint when any of these conditions are met:
+
+| Condition | Trigger |
+|---|---|
+| 9+ turns | Always submit |
+| 5+ turns AND any intelligence extracted | Submit early if data found |
+| 3+ turns AND 5+ red flags | Submit early if high-confidence scam |
+
+The submitted payload includes:
+```json
+{
+  "sessionId": "...",
+  "scamDetected": true,
+  "scamType": "bank_fraud",
+  "confidenceLevel": "high",
+  "totalMessagesExchanged": 7,
+  "engagementDurationSeconds": 142,
+  "extractedIntelligence": {
+    "phoneNumbers": ["+91-9876543210"],
+    "bankAccounts": [],
+    "upiIds": ["scammer@fakebank"],
+    "phishingLinks": [],
+    "emailAddresses": [],
+    "caseIds": ["SBI-12345"],
+    "policyNumbers": [],
+    "orderNumbers": []
+  },
+  "agentNotes": "Honeypot (Ramesh persona) engaged scammer for 7 turns over 142s. Scam classified as [bank_fraud] with [high] confidence. Red flags: Urgency language; OTP / PIN request; Account threat; Impersonation; Authority impersonation."
+}
 ```
 
 ---
@@ -126,8 +229,8 @@ X-API-Key: YOUR_API_KEY
 ### Prerequisites
 
 - Node.js 18.x or higher
-- npm or yarn
-- OpenRouter API key
+- npm
+- Google Gemini API key
 
 ### Installation
 
@@ -145,12 +248,8 @@ X-API-Key: YOUR_API_KEY
 3. **Create `.env` file**
    ```env
    PORT=3000
-   NODE_ENV=development
-   API_KEY=MySecureHoneypotKey2024
-   OPENROUTER_API_KEY=your_openrouter_api_key_here
-   AI_MODEL=anthropic/claude-3.5-sonnet
-   MAX_TOKENS=1000
-   APP_URL=http://localhost:3000
+   API_KEY=your_secure_api_key_here
+   GEMINI_API_KEY=your_gemini_api_key_here
    ```
 
 4. **Start the server**
@@ -158,206 +257,126 @@ X-API-Key: YOUR_API_KEY
    npm start
    ```
 
-   For development with auto-reload:
-   ```bash
-   npm run dev
-   ```
-
 5. **Test the API**
    ```bash
-   curl http://localhost:3000/health
+   curl http://localhost:3000/
    ```
 
 ---
 
 ## 🌐 Deployment on Render.com
 
-### Step 1: Prepare for Deployment
+### Environment Variables
 
-Ensure these files are in your repository:
-- ✅ `package.json` with all dependencies
-- ✅ `.gitignore` (exclude `.env` and `node_modules`)
-- ✅ `README.md` (this file)
+Add these in the Render dashboard under your service's **Environment** tab:
 
-### Step 2: Deploy to Render
+| Variable | Required | Description |
+|---|---|---|
+| `PORT` | No (default: 3000) | Server port |
+| `API_KEY` | **Yes** | Authentication key sent in `x-api-key` header |
+| `GEMINI_API_KEY` | **Yes** | Google Gemini API key |
 
-1. Sign up/Login at [render.com](https://render.com)
-2. Click **"New +"** → **"Web Service"**
-3. Connect your GitHub repository
-4. Configure settings:
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start`
-   - **Instance Type**: Free or Starter
+### Trust Proxy (Required on Render)
 
-### Step 3: Environment Variables
+The app sets `app.set('trust proxy', 1)` to correctly identify client IPs behind Render's load balancer. This is required for `express-rate-limit` to function correctly.
 
-Add these in Render dashboard:
+### Build & Start Commands
 
-| Variable | Value |
-|----------|-------|
-| `NODE_ENV` | `production` |
-| `PORT` | `3000` |
-| `API_KEY` | Your secure API key |
-| `OPENROUTER_API_KEY` | Your OpenRouter API key |
-| `AI_MODEL` | `anthropic/claude-3.5-sonnet` |
-| `MAX_TOKENS` | `1000` |
-| `APP_URL` | Your Render URL (update after first deploy) |
-
-### Step 4: Test Deployment
-
-```bash
-# Health check
-curl https://your-app-name.onrender.com/health
-
-# Message endpoint
-curl -X POST https://your-app-name.onrender.com/api/message \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Your bank account has been suspended"}'
-```
+| Setting | Value |
+|---|---|
+| Build Command | `npm install` |
+| Start Command | `npm start` |
 
 ---
 
-## 🧪 Testing with PowerShell
+## 🧪 Testing
 
-### Test Health Endpoint
-```powershell
-Invoke-RestMethod -Uri https://your-app.onrender.com/health -Method Get | ConvertTo-Json
+### Quick cURL Test
+```bash
+curl -X POST https://your-app.onrender.com/api/message \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "test-session-001",
+    "message": {
+      "sender": "scammer",
+      "text": "URGENT: Your SBI account has been blocked. Share OTP immediately to restore access.",
+      "timestamp": "2026-02-01T10:00:00Z"
+    },
+    "conversationHistory": [],
+    "metadata": { "channel": "SMS", "language": "English", "locale": "IN" }
+  }'
 ```
 
-### Test Message Endpoint
+### PowerShell Test
 ```powershell
 $headers = @{
-    "X-API-Key" = "MySecureHoneypotKey2024"
+    "x-api-key"    = "YOUR_API_KEY"
     "Content-Type" = "application/json"
 }
 
 $body = @{
-    message = "Your bank account has been suspended. Please verify immediately."
-} | ConvertTo-Json
+    sessionId = "test-session-001"
+    message   = @{
+        sender    = "scammer"
+        text      = "Your SBI account has been blocked. Share OTP to restore access."
+        timestamp = "2026-02-01T10:00:00Z"
+    }
+    conversationHistory = @()
+    metadata = @{ channel = "SMS"; language = "English"; locale = "IN" }
+} | ConvertTo-Json -Depth 5
 
-Invoke-RestMethod -Uri https://your-app.onrender.com/api/message -Method Post -Headers $headers -Body $body | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "https://your-app.onrender.com/api/message" -Method Post -Headers $headers -Body $body | ConvertTo-Json -Depth 5
 ```
 
 ---
 
-## 🎨 How It Works
+## 📊 Scoring Alignment
 
-### 1. Scam Detection Engine
-- Pattern-based detection using regex
-- Identifies urgency indicators, verification requests, financial threats
-- Confidence scoring based on multiple pattern matches
-
-### 2. Intelligence Extraction
-Automatically extracts:
-- 💳 Bank account numbers (9-18 digits)
-- 💸 UPI IDs (format: user@provider)
-- 📱 Phone numbers (10-digit Indian format)
-- 🔗 URLs and phishing links
-- 🏦 IFSC codes
-- 📧 Email addresses
-
-### 3. Agentic AI Engagement
-- Maintains believable victim persona
-- Asks clarifying questions to extract more data
-- Never reveals scam detection
-- Keeps scammer engaged for intelligence gathering
-
-### 4. Conversation Management
-- Persistent conversation storage
-- Full message history tracking
-- Engagement metrics and analytics
+| Category | Max Points | How This API Scores |
+|---|---|---|
+| Scam Detection | 20 pts | Pattern engine detects all 12 scam types; `scamDetected: true` submitted in final output |
+| Intelligence Extraction | 30 pts | Regex extraction covers phones, UPI, bank accounts, links, emails, case/policy/order IDs |
+| Conversation Quality | 30 pts | Rotating strategies ensure 5+ investigative questions; red flags logged every turn |
+| Engagement Quality | 10 pts | Session timer + message counter submitted; fallbacks keep scammer engaged |
+| Response Structure | 10 pts | All required fields (`sessionId`, `scamDetected`, `extractedIntelligence`, `totalMessagesExchanged`, `engagementDurationSeconds`, `agentNotes`, `scamType`, `confidenceLevel`) present in final output |
 
 ---
 
-## 📊 Example Intelligence Gathering
+## ⚠️ Rate Limiting
 
-**Scammer Input:**
-```
-"Transfer Rs.5000 to UPI scammer@paytm. Call 9876543210 for help."
-```
-
-**Extracted Intelligence:**
-```json
-{
-  "upiIds": ["scammer@paytm"],
-  "phoneNumbers": ["9876543210"],
-  "scamScore": 4,
-  "confidence": 80
-}
-```
-
-**AI Response:**
-```
-"I'm worried about my account! Can you explain why I need to send Rs.5000? 
-Let me write down that UPI ID - it's scammer@paytm, correct? 
-Could you share your employee ID first?"
-```
+- **60 requests per minute** per IP on `/api/message`
+- OPTIONS requests are skipped (CORS preflight)
+- Returns `429` with a JSON error on limit exceeded
 
 ---
 
-## 🔒 Security Features
+## 🔒 Security
 
-- ✅ API Key authentication on all protected endpoints
-- ✅ Request validation and sanitization
-- ✅ CORS enabled for cross-origin requests
-- ✅ Environment variable protection
-- ✅ No sensitive data logged
-
----
-
-## 📈 Performance Metrics
-
-- **Scam Detection**: 80%+ confidence
-- **Response Time**: ~4.5 seconds average
-- **Intelligence Extraction**: Real-time
-- **Conversation Persistence**: In-memory (Redis/MongoDB recommended for production)
-
----
-
-## 🛡️ Buildathon Submission
-
-### Endpoint for Testing
-```
-POST https://your-app.onrender.com/api/message
-X-API-Key: YOUR_API_KEY
-```
-
-### Demo Conversation Flow
-1. Initial scam message detected
-2. AI engages as naive victim
-3. Extracts UPI ID, phone number
-4. Continues engagement for more intelligence
+- API key required on all `/api/message` requests
+- Keys compared against `process.env.API_KEY`
+- CORS open to all origins (suitable for hackathon evaluation)
+- No sensitive data logged; only session IDs, scam types, and turn counts
 
 ---
 
 ## 📝 Environment Variables Reference
 
 | Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
+|---|---|---|---|
 | `PORT` | No | `3000` | Server port |
-| `NODE_ENV` | No | `development` | Environment mode |
-| `API_KEY` | **Yes** | - | API authentication key |
-| `OPENROUTER_API_KEY` | **Yes** | - | OpenRouter API key |
-| `AI_MODEL` | No | `anthropic/claude-3.5-sonnet` | AI model to use |
-| `MAX_TOKENS` | No | `1000` | Max tokens for AI response |
-| `APP_URL` | No | `http://localhost:3000` | Application URL |
-
----
-
-## 🤝 Contributing
-
-This is a buildathon project. For issues or suggestions, please open an issue on GitHub.
+| `API_KEY` | **Yes** | — | API authentication key |
+| `GEMINI_API_KEY` | **Yes** | — | Google Gemini API key |
 
 ---
 
 ## 📄 License
 
-MIT License - feel free to use this for educational purposes.
+MIT License — free to use for educational purposes.
 
 ---
 
-## 👨‍💻 Author
+## 👩‍💻 Author
 
 **Kritika Benjwal**  
 HCL GUVI India Impact AI Buildathon 2026
@@ -366,18 +385,9 @@ HCL GUVI India Impact AI Buildathon 2026
 
 ## 🙏 Acknowledgments
 
-- **OpenRouter** for AI API access
-- **Anthropic Claude 3.5 Sonnet** for intelligent engagement
+- **Google Gemini** for powering the Ramesh persona
 - **HCL & GUVI** for organizing the buildathon
 - **Express.js** community for excellent documentation
-
----
-
-## 📞 Support
-
-For questions or support:
-- GitHub Issues: [Create an issue](https://github.com/YOUR_USERNAME/honeypot-api/issues)
-- Email: ananya.benjwal@gmail.com
 
 ---
 
