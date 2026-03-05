@@ -142,7 +142,7 @@ async function callGemini(systemPrompt, messages, userMessage, attempt = 1, dead
       {
         contents,
         generationConfig: {
-          maxOutputTokens: 500,
+          maxOutputTokens: 1024,
           temperature: 0.75
         }
       },
