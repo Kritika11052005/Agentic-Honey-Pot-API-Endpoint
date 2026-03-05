@@ -179,7 +179,7 @@ async function callGemini(systemPrompt, messages, userMessage, attempt = 1, dead
  */
 async function generateAgentReply(session, userMessage) {
   // Turn 1 always uses a fixed opener — saves time, ensures quality
-  if (session.turns === 1) {
+  if (session.turns === 1 && (!body.conversationHistory || body.conversationHistory.length === 0)) {
     return "Oh my god, is it really blocked? I am very worried. Before anything else, can you please tell me your name and your employee ID number so I can write it down?";
   }
 
