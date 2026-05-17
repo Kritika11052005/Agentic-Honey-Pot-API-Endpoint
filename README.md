@@ -12,7 +12,7 @@ AI-powered honeypot system for detecting and engaging with scammers using advanc
 
 ## 🎯 Project Overview
 
-**Agentic Honey-Pot API** is an intelligent scam detection and engagement system built for the **HCL GUVI India Impact AI Buildathon**. It autonomously detects scam attempts, engages with scammers using a convincing AI-powered victim persona ("Ramesh"), and extracts critical intelligence for law enforcement.
+**Agentic Honey-Pot API** is an intelligent scam detection and engagement system built for the **HCL GUVI India Impact AI Buildathon**. It autonomously detects scam attempts, engages with scammers using a convincing AI-powered victim persona ("Sarthak"), and extracts critical intelligence for law enforcement.
 
 ### Key Features
 
@@ -41,7 +41,7 @@ AI-powered honeypot system for detecting and engaging with scammers using advanc
 honeypot-api/
 ├── server.js               # Entry point — Express app, routing, session management
 ├── src/
-│   ├── agentReply.js       # Gemini LLM integration, Ramesh persona, fallback replies
+│   ├── agentReply.js       # Gemini LLM integration, Sarthak persona, fallback replies
 │   ├── scamDetector.js     # 12-pattern scam detection + scam type classifier
 │   ├── intelExtractor.js   # Regex-based intelligence extraction & merging
 │   └── finalSubmit.js      # Posts final result to GUVI evaluation endpoint
@@ -161,7 +161,7 @@ All fields are merged and deduplicated across turns using `mergeIntel()`. Metada
 
 ### 3. Agentic AI Engagement (`agentReply.js`)
 
-The agent plays **Ramesh** — a naive, 68-year-old retired government employee from Chennai who doesn't know he's being scammed.
+The agent plays **Sarthak** — a naive, 68-year-old retired government employee from Chennai who doesn't know he's being scammed.
 
 **Turn 1** always uses a fixed opener to save response time and ensure quality engagement.
 
@@ -218,7 +218,7 @@ The submitted payload includes:
     "policyNumbers": [],
     "orderNumbers": []
   },
-  "agentNotes": "Honeypot (Ramesh persona) engaged scammer for 7 turns over 142s. Scam classified as [bank_fraud] with [high] confidence. Red flags: Urgency language; OTP / PIN request; Account threat; Impersonation; Authority impersonation."
+  "agentNotes": "Honeypot (Sarthak persona) engaged scammer for 7 turns over 142s. Scam classified as [bank_fraud] with [high] confidence. Red flags: Urgency language; OTP / PIN request; Account threat; Impersonation; Authority impersonation."
 }
 ```
 
@@ -385,7 +385,7 @@ HCL GUVI India Impact AI Buildathon 2026
 
 ## 🙏 Acknowledgments
 
-- **Google Gemini** for powering the Ramesh persona
+- **Google Gemini** for powering the Sarthak persona
 - **HCL & GUVI** for organizing the buildathon
 - **Express.js** community for excellent documentation
 
